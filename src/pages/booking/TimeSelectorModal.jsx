@@ -4,6 +4,7 @@ function TimeSelectorModal({
   isOpen,
   onClose,
   selectedDate,
+  selectedNavatar,
   selectedStartTime,
   onStartTimeChange,
   selectedEndTime,
@@ -11,11 +12,16 @@ function TimeSelectorModal({
   onCheckAvailability,
   onOverlayClick
 }) {
-  if (!isOpen || !selectedDate) return null;
+  if (!isOpen || !selectedNavatar) return null;
 
   return (
     <div className="modal-overlay" onClick={onOverlayClick}>
       <div className="time-container">
+        {selectedNavatar && (
+          <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+            <strong>Booking for:</strong> {selectedNavatar.navatar_name} ({selectedNavatar.location})
+          </div>
+        )}
         <p className='modal-header' style={{ textAlign: 'center' }}>Select start and end time for {format(selectedDate, 'MMMM d, yyyy')}</p>
         <div className="time-inputs">
           <label>

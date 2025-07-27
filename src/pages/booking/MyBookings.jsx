@@ -9,7 +9,6 @@ function MyBookings({ bookings, onSelectBookingForCancellation }) {
     const [reminder, setReminder] = useState('');
     const [notifiedIntervals, setNotifiedIntervals] = useState({});
 
-    // Memoize upcomingBookings to prevent unnecessary recalculations
     const upcomingBookings = useMemo(() => {
         if (!bookings) return [];
         return bookings
@@ -109,7 +108,20 @@ function MyBookings({ bookings, onSelectBookingForCancellation }) {
                             '--delay': `${(index + 1)}s`
                         }}>
                             <span>{format(slot.date, 'MMMM d, yyyy')}</span>
-                            <span>{slot.start_time}</span> - <span>{slot.end_time}</span>
+                            <span>
+                                {new Date(`1970-01-01T${slot.start_time}`).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })}
+                            </span>
+                            -
+                            <span>
+                                {new Date(`1970-01-01T${slot.end_time}`).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                })}
+                            </span>
+
                             <div className="booking-actions">
                                 <button
                                     className="btn btn-success"

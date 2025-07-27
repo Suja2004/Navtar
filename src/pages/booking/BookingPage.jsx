@@ -6,7 +6,7 @@ import {
 } from 'date-fns';
 
 import { useUser } from '@clerk/clerk-react';
-import { getBookings, createBooking, deleteBooking } from '../../context/api';
+import { getBookingsByHospital, createBooking, deleteBooking, getUserByEmail } from '../../context/api';
 
 import Navbar from '../../components/common/Navbar';
 import CalendarGrid from './CalendarGrid';
@@ -14,16 +14,52 @@ import TimeSelectorModal from './TimeSelectorModal';
 import BookingActionModal from './BookingActionModal';
 import MyBookings from './MyBookings';
 import NotificationPopup from './NotificationPopup';
+import NavatarList from './NavatarList';
 import './BookingPage.css';
 
 function BookingPage() {
   const { user, isLoaded } = useUser();
+  const [userData, setUserData] = useState(null);
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    const fetchUserDetails = async () => {
+      if (!isLoaded || !user?.primaryEmailAddress?.emailAddress) return;
+
+      const email = user.primaryEmailAddress.emailAddress;
+      const { role, data } = await getUserByEmail(email);
+
+      if (role === "doctor") {
+        setUserData({
+          id: data.id,
+          hospital_id: data.hospital_id,
+        });
+        setRole("doctor");
+      } else if (role === "nurse") {
+        setUserData({
+          id: data.id,
+          hospital_id: data.hospital_id,
+          assigned_doctor_id: data.assigned_doctor_id,
+        });
+        setRole("nurse");
+      } else {
+        setUserData(null);
+        setRole(null);
+      }
+    };
+
+    fetchUserDetails();
+  }, [isLoaded, user]);
+
+  console.log(userData);
 
   const [calendarDays, setCalendarDays] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedNavatar, setSelectedNavatar] = useState(null);
   const [selectedStartTime, setSelectedStartTime] = useState('');
   const [selectedEndTime, setSelectedEndTime] = useState('');
 
+  const [isNavatarSelectorOpen, setIsNavatarSelectorOpen] = useState(false);
   const [isTimeSelectorOpen, setIsTimeSelectorOpen] = useState(false);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [actionModalType, setActionModalType] = useState('');
@@ -45,15 +81,17 @@ function BookingPage() {
   }, [isTimeSelectorOpen, isActionModalOpen]);
 
   useEffect(() => {
-    getBookings()
-      .then(data => setBookedSlots(data))
+    if (!userData?.hospital_id) return;
+    getBookingsByHospital(userData.hospital_id)
+      .then(setBookedSlots)
       .catch(() => {
         setPopupMessage('Failed to load bookings.');
         setPopupType('error');
         setPopup(true);
         setTimeout(() => setPopup(false), delay);
       });
-  }, []);
+  }, [userData]);
+
 
   useEffect(() => {
     const start = startOfMonth(new Date());
@@ -61,25 +99,65 @@ function BookingPage() {
     setCalendarDays(eachDayOfInterval({ start, end }));
   }, []);
 
-  if (!isLoaded) return <div>Loading...</div>;
-  if (!user) return <div>User not authenticated</div>;
+  if (!isLoaded) {
+    return (
+      <>
+        <Navbar />
+        <div className="loading">Loading...</div>
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Navbar />
+        <div className="loading">User not authenticated</div>
+      </>
+    );
+  }
+
+  if (role === null) {
+    return (
+      <>
+        <Navbar />
+        <div className="loading">Access denied. User not recognized as nurse or doctor.</div>
+      </>
+    );
+  }
+
+  // Extra condition for nurse trying to access BookingPage
+  if (role === "nurse" && (!userData?.assigned_doctor_id || userData.assigned_doctor_id === null)) {
+    return (
+      <>
+        <Navbar />
+        <div className="loading">Access denied. Nurse is not assigned to any doctor.</div>
+      </>
+    );
+  }
 
   const myBookings = bookedSlots.filter(slot => {
-    if (!slot.user_id) return false;
+    if (!slot.doctor_id) return false;
     let userObj;
     try {
-      userObj = JSON.parse(slot.user_id);
+      userObj = JSON.parse(slot.doctor_id);
     } catch {
       return false;
     }
-    return userObj.id === user.id;
+    return userObj === user.id;
   });
 
   const handleDateClick = (day) => {
     setSelectedDate(day);
+    setSelectedNavatar(null);
+    setIsNavatarSelectorOpen(true);
+  };
+
+  const handleSelectNavatar = (navatar) => {
+    setSelectedNavatar(navatar);
+    setIsTimeSelectorOpen(true);
     setSelectedStartTime('');
     setSelectedEndTime('');
-    setIsTimeSelectorOpen(true);
   };
 
   const isSlotOverlapping = (date, startTime, endTime, slotsList) => {
@@ -137,14 +215,19 @@ function BookingPage() {
       date: format(selectedDate, 'yyyy-MM-dd'),
       start_time: selectedStartTime,
       end_time: selectedEndTime,
-      user_id: JSON.stringify(user)
+      doctor_id: role === 'doctor' ? userData?.id : userData?.assigned_doctor_id,
+      nurse_id: role === 'nurse' ? userData?.id : null,
+      navatar_id: selectedNavatar?.navatar_id || null,
+      location: selectedNavatar?.location || "Ward",
+      status: "Booked"
     };
+
 
     try {
       await createBooking(newBooking);
       setPopupMessage(`Booking confirmed for ${format(selectedDate, 'MMMM d, yyyy')} from ${selectedStartTime} to ${selectedEndTime}`);
       setPopupType('success');
-      getBookings().then(setBookedSlots);
+      getBookingsByHospital(13).then(setBookedSlots);
     } catch {
       setPopupMessage('Failed to save booking. Please try again.');
       setPopupType('error');
@@ -153,6 +236,7 @@ function BookingPage() {
     setPopup(true);
     setTimeout(() => setPopup(false), delay);
     setIsActionModalOpen(false);
+    setIsNavatarSelectorOpen(false);
     setConfirmLoading(false);
   };
 
@@ -186,10 +270,10 @@ function BookingPage() {
     }
 
     try {
-      await deleteBooking(bookingToDelete.id);
+      await deleteBooking(bookingToDelete.booking_id);
       setPopupMessage(`Booking cancelled for ${format(selectedDate, 'MMMM d, yyyy')} at ${selectedStartTime}`);
       setPopupType('success');
-      getBookings().then(setBookedSlots);
+      getBookingsByHospital(13).then(setBookedSlots);
     } catch {
       setPopupMessage('Failed to update bookings. Please try again.');
       setPopupType('error');
@@ -203,6 +287,10 @@ function BookingPage() {
 
   const handleTimeSelectorOverlayClick = (e) => {
     if (e.target === e.currentTarget) setIsTimeSelectorOpen(false);
+  };
+
+  const handleNavatarOverlayClick = (e) => {
+    if (e.target === e.currentTarget) setIsNavatarSelectorOpen(false);
   };
 
   return (
@@ -229,6 +317,7 @@ function BookingPage() {
         isOpen={isTimeSelectorOpen}
         onClose={() => setIsTimeSelectorOpen(false)}
         selectedDate={selectedDate}
+        selectedNavatar={selectedNavatar}
         selectedStartTime={selectedStartTime}
         onStartTimeChange={setSelectedStartTime}
         selectedEndTime={selectedEndTime}
@@ -256,6 +345,13 @@ function BookingPage() {
         message={popupMessage}
         type={popupType}
         onClose={() => setPopup(false)}
+      />
+      <NavatarList
+        hospitalId={userData?.hospital_id}
+        selectedDate={selectedDate}
+        isNavatarSelectorOpen={isNavatarSelectorOpen}
+        onSelectNavatar={handleSelectNavatar}
+        onOverlayClick={handleNavatarOverlayClick}
       />
     </>
   );
