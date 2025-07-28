@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  isBefore, parse, format,
-  startOfMonth, endOfMonth, eachDayOfInterval,
-  isSameDay, parseISO
+  isBefore, parse, format, eachDayOfInterval,
+  isSameDay, addDays
 } from 'date-fns';
 
 import { useUser } from '@clerk/clerk-react';
-import { getBookingsByHospital, createBooking, deleteBooking, getUserByEmail } from '../../context/api';
+import { getBookingsByHospital, createBooking, deleteBooking, getUserByEmail, listDoctors, getNavatarsByHospital } from '../../context/api';
 
 import Navbar from '../../components/common/Navbar';
 import CalendarGrid from './CalendarGrid';
@@ -21,37 +20,11 @@ function BookingPage() {
   const { user, isLoaded } = useUser();
   const [userData, setUserData] = useState(null);
   const [role, setRole] = useState(null);
-
-  useEffect(() => {
-    const fetchUserDetails = async () => {
-      if (!isLoaded || !user?.primaryEmailAddress?.emailAddress) return;
-
-      const email = user.primaryEmailAddress.emailAddress;
-      const { role, data } = await getUserByEmail(email);
-
-      if (role === "doctor") {
-        setUserData({
-          id: data.id,
-          hospital_id: data.hospital_id,
-        });
-        setRole("doctor");
-      } else if (role === "nurse") {
-        setUserData({
-          id: data.id,
-          hospital_id: data.hospital_id,
-          assigned_doctor_id: data.assigned_doctor_id,
-        });
-        setRole("nurse");
-      } else {
-        setUserData(null);
-        setRole(null);
-      }
-    };
-
-    fetchUserDetails();
-  }, [isLoaded, user]);
-
-  console.log(userData);
+  const [userLoading, setUserLoading] = useState(true);
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [navatars, setNavatars] = useState([]);
 
   const [calendarDays, setCalendarDays] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -75,6 +48,43 @@ function BookingPage() {
   const delay = 3000;
 
   useEffect(() => {
+    const fetchUserDetails = async () => {
+      if (!isLoaded || !user?.primaryEmailAddress?.emailAddress) return;
+
+      const email = user.primaryEmailAddress.emailAddress;
+      const { role, data } = await getUserByEmail(email);
+
+      if (role === "doctor") {
+        setUserData({
+          id: data.id,
+          hospital_id: data.hospital_id,
+        });
+        setRole("doctor");
+        setSelectedDoctorId(data.id);
+      } else if (role === "nurse") {
+        setUserData({
+          id: data.id,
+          hospital_id: data.hospital_id,
+          assigned_doctor_id: data.assigned_doctor_id,
+        });
+        setRole("nurse");
+        try {
+          const response = await listDoctors(data.hospital_id);
+          setDoctorsList(response);
+        } catch (err) {
+          console.error("Failed to fetch doctors for nurse:", err);
+        }
+      } else {
+        setUserData(null);
+        setRole(null);
+      }
+      setUserLoading(false);
+    };
+
+    fetchUserDetails();
+  }, [isLoaded, user]);
+
+  useEffect(() => {
     const isAnyModalOpen = isTimeSelectorOpen || isActionModalOpen;
     document.body.style.overflow = isAnyModalOpen ? 'hidden' : 'unset';
     return () => { document.body.style.overflow = 'unset'; };
@@ -92,14 +102,28 @@ function BookingPage() {
       });
   }, [userData]);
 
-
   useEffect(() => {
-    const start = startOfMonth(new Date());
-    const end = endOfMonth(new Date());
-    setCalendarDays(eachDayOfInterval({ start, end }));
+    const today = new Date();
+    const end = addDays(today, 34);
+    const days = eachDayOfInterval({ start: today, end });
+    setCalendarDays(days);
   }, []);
 
-  if (!isLoaded) {
+  useEffect(() => {
+    if (!userData?.hospital_id) return;
+
+    async function fetchNavatars() {
+      try {
+        const data = await getNavatarsByHospital(userData.hospital_id);
+        setNavatars(data);
+      } catch (err) {
+        console.error("Error fetching navatars:", err);
+      }
+    }
+    fetchNavatars();
+  }, [userData]);
+
+  if (!isLoaded || userLoading) {
     return (
       <>
         <Navbar />
@@ -126,28 +150,31 @@ function BookingPage() {
     );
   }
 
-  // Extra condition for nurse trying to access BookingPage
-  if (role === "nurse" && (!userData?.assigned_doctor_id || userData.assigned_doctor_id === null)) {
-    return (
-      <>
-        <Navbar />
-        <div className="loading">Access denied. Nurse is not assigned to any doctor.</div>
-      </>
-    );
-  }
-
   const myBookings = bookedSlots.filter(slot => {
-    if (!slot.doctor_id) return false;
-    let userObj;
-    try {
-      userObj = JSON.parse(slot.doctor_id);
-    } catch {
-      return false;
-    }
-    return userObj === user.id;
+    return String(slot.doctor_id) === String(selectedDoctorId);
   });
 
+
+  const handleDoctorChange = (e) => {
+    const name = e.target.value;
+    setInputValue(name);
+
+    const matchedDoctor = doctorsList.find((doc) => doc.name === name);
+    if (matchedDoctor) {
+      setSelectedDoctorId(matchedDoctor.id);
+    } else {
+      setSelectedDoctorId("");
+    }
+  };
+
   const handleDateClick = (day) => {
+    if (role === "nurse" && !selectedDoctorId) {
+      setPopupMessage('Select a Doctor');
+      setPopupType('error');
+      setPopup(true);
+      setTimeout(() => setPopup(false), delay);
+      return;
+    }
     setSelectedDate(day);
     setSelectedNavatar(null);
     setIsNavatarSelectorOpen(true);
@@ -160,15 +187,55 @@ function BookingPage() {
     setSelectedEndTime('');
   };
 
-  const isSlotOverlapping = (date, startTime, endTime, slotsList) => {
-    if (!startTime || !endTime || !date) return false;
-    const newBookingStartDateTime = parse(`${format(date, 'yyyy-MM-dd')} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-    const newBookingEndDateTime = parse(`${format(date, 'yyyy-MM-dd')} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+  const isSlotOverlapping = (selectedDoctorId, date, startTime, endTime, slotsList, navatarId) => {
+    if (!startTime || !endTime || !date || !navatarId || !selectedDoctorId) return false;
+
+    const newStart = parse(
+      `${format(date, 'yyyy-MM-dd')} ${startTime}`,
+      'yyyy-MM-dd HH:mm',
+      new Date()
+    );
+    const newEnd = parse(
+      `${format(date, 'yyyy-MM-dd')} ${endTime}`,
+      'yyyy-MM-dd HH:mm',
+      new Date()
+    );
+
     return slotsList.some(slot => {
-      if (!isSameDay(parseISO(slot.date), date)) return false;
-      const existingSlotStartDateTime = parse(`${format(parseISO(slot.date), 'yyyy-MM-dd')} ${slot.start_time}`, 'yyyy-MM-dd HH:mm', new Date());
-      const existingSlotEndDateTime = parse(`${format(parseISO(slot.date), 'yyyy-MM-dd')} ${slot.end_time}`, 'yyyy-MM-dd HH:mm', new Date());
-      return newBookingStartDateTime < existingSlotEndDateTime && newBookingEndDateTime > existingSlotStartDateTime;
+      const sameDate = slot.date === format(date, 'yyyy-MM-dd');
+      if (!sameDate) return false;
+
+      const existingStart = parse(
+        `${slot.date} ${slot.start_time}`,
+        'yyyy-MM-dd HH:mm:ss',
+        new Date()
+      );
+      const existingEnd = parse(
+        `${slot.date} ${slot.end_time}`,
+        'yyyy-MM-dd HH:mm:ss',
+        new Date()
+      );
+
+      const isOverlapping = newStart < existingEnd && newEnd > existingStart;
+
+      // Condition 1: Same navatar overlap (by any doctor)
+      const navatarConflict = String(slot.navatar_id) === String(navatarId);
+
+      // Condition 2: Same doctor overlap (with any navatar)
+      const doctorConflict = String(slot.doctor_id) === String(selectedDoctorId);
+
+      if (isOverlapping && (navatarConflict || doctorConflict)) {
+        console.log("❌ Conflict:", {
+          navatarConflict,
+          doctorConflict,
+          slot,
+          newStart,
+          newEnd,
+        });
+        return true;
+      }
+
+      return false;
     });
   };
 
@@ -188,7 +255,7 @@ function BookingPage() {
       setIsTimeSelectorOpen(false);
       return;
     }
-    if (isSlotOverlapping(selectedDate, selectedStartTime, selectedEndTime, bookedSlots)) {
+    if (isSlotOverlapping(selectedDoctorId, selectedDate, selectedStartTime, selectedEndTime, bookedSlots, selectedNavatar.navatar_id)) {
       setMessage("This slot is already booked.");
       setActionModalType('booked');
       setIsActionModalOpen(true);
@@ -215,23 +282,23 @@ function BookingPage() {
       date: format(selectedDate, 'yyyy-MM-dd'),
       start_time: selectedStartTime,
       end_time: selectedEndTime,
-      doctor_id: role === 'doctor' ? userData?.id : userData?.assigned_doctor_id,
+      doctor_id: role === 'doctor' ? userData?.id : selectedDoctorId,
       nurse_id: role === 'nurse' ? userData?.id : null,
       navatar_id: selectedNavatar?.navatar_id || null,
       location: selectedNavatar?.location || "Ward",
       status: "Booked"
     };
 
-
     try {
       await createBooking(newBooking);
       setPopupMessage(`Booking confirmed for ${format(selectedDate, 'MMMM d, yyyy')} from ${selectedStartTime} to ${selectedEndTime}`);
       setPopupType('success');
-      getBookingsByHospital(13).then(setBookedSlots);
-    } catch {
-      setPopupMessage('Failed to save booking. Please try again.');
+      getBookingsByHospital(userData.hospital_id).then(setBookedSlots);
+    } catch (error) {
+      setPopupMessage(`Failed to save booking. ${error?.response?.data?.detail || error.message || 'Please try again.'}`);
       setPopupType('error');
     }
+
 
     setPopup(true);
     setTimeout(() => setPopup(false), delay);
@@ -273,7 +340,7 @@ function BookingPage() {
       await deleteBooking(bookingToDelete.booking_id);
       setPopupMessage(`Booking cancelled for ${format(selectedDate, 'MMMM d, yyyy')} at ${selectedStartTime}`);
       setPopupType('success');
-      getBookingsByHospital(13).then(setBookedSlots);
+      getBookingsByHospital(userData.hospital_id).then(setBookedSlots);
     } catch {
       setPopupMessage('Failed to update bookings. Please try again.');
       setPopupType('error');
@@ -297,20 +364,45 @@ function BookingPage() {
     <>
       <Navbar />
       <div className="booking-page">
-        <div className="booking-container">
-          <h1>Book Navatar Robot</h1>
-          <p>Select a date from the dates below:</p>
-          <CalendarGrid
-            calendarDays={calendarDays}
-            selectedDate={selectedDate}
-            onDateClick={handleDateClick}
+        <div className="doctor-list">
+          {role === "nurse" && doctorsList && (
+            <>
+              <h4>Handling Booking For</h4>
+              <input
+                list="doctor-options"
+                value={inputValue}
+                onChange={handleDoctorChange}
+                placeholder="Doctor"
+              />
+              <datalist id="doctor-options">
+                {doctorsList.map((doc) => (
+                  <option key={doc.id} value={doc.name} />
+                ))}
+              </datalist>
+            </>
+          )}
+
+        </div>
+        <div className='main-booking-content'>
+          <div className="booking-container">
+            <h1>Book Navatar Robot</h1>
+            <p>Select a date from the dates below:</p>
+            <CalendarGrid
+              calendarDays={calendarDays}
+              selectedDate={selectedDate}
+              onDateClick={handleDateClick}
+            />
+          </div>
+
+
+          <MyBookings
+            role={role}
+            doctor={inputValue}
+            bookings={myBookings}
+            navatars={navatars}
+            onSelectBookingForCancellation={handleSelectBookingForCancellation}
           />
         </div>
-
-        <MyBookings
-          bookings={myBookings}
-          onSelectBookingForCancellation={handleSelectBookingForCancellation}
-        />
       </div>
 
       <TimeSelectorModal
@@ -347,7 +439,7 @@ function BookingPage() {
         onClose={() => setPopup(false)}
       />
       <NavatarList
-        hospitalId={userData?.hospital_id}
+        navatars={navatars}
         selectedDate={selectedDate}
         isNavatarSelectorOpen={isNavatarSelectorOpen}
         onSelectNavatar={handleSelectNavatar}

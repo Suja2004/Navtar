@@ -1,23 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { getNavatarsByHospital } from "../../context/api";
 
-const NavatarList = ({ hospitalId, isNavatarSelectorOpen, selectedDate, onSelectNavatar, onOverlayClick }) => {
-    const [navatars, setNavatars] = useState([]);
+const NavatarList = ({ navatars, isNavatarSelectorOpen, selectedDate, onSelectNavatar, onOverlayClick }) => {
     const [search, setSearch] = useState("");
     const [filtered, setFiltered] = useState([]);
-
-    useEffect(() => {
-        async function fetchNavatars() {
-            try {
-                const data = await getNavatarsByHospital(hospitalId);
-                setNavatars(data);
-                setFiltered(data);
-            } catch (err) {
-                console.error("Error fetching navatars:", err);
-            }
-        }
-        fetchNavatars();
-    }, [hospitalId]);
 
     useEffect(() => {
         const lower = search.toLowerCase();

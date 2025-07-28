@@ -28,7 +28,10 @@ export async function createBooking(booking) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(booking),
   });
-  if (!response.ok) throw new Error("Failed to create booking");
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Failed to create booking");
+  }
   return response.json();
 }
 
@@ -90,4 +93,11 @@ export async function getUserByEmail(email) {
   if (doctor) return { role: "doctor", data: doctor };
   if (nurse) return { role: "nurse", data: nurse };
   return { role: null, data: null };
+}
+
+// Get all doctors under a hospital
+export async function listDoctors(hospitalId) {
+  const response = await fetch(`${API_URL}/admin/${hospitalId}/doctors`);
+  if (!response.ok) throw new Error("Failed to fetch doctors by hospital");
+  return response.json();
 }
