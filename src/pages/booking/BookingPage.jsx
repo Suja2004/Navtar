@@ -57,6 +57,7 @@ function BookingPage() {
       if (role === "doctor") {
         setUserData({
           id: data.id,
+          name: data.name,
           hospital_id: data.hospital_id,
         });
         setRole("doctor");
@@ -64,6 +65,7 @@ function BookingPage() {
       } else if (role === "nurse") {
         setUserData({
           id: data.id,
+          name: data.name,
           hospital_id: data.hospital_id,
           assigned_doctor_id: data.assigned_doctor_id,
         });
@@ -127,7 +129,7 @@ function BookingPage() {
     return (
       <>
         <Navbar />
-        <div className="loading">Loading...</div>
+        <div className="bookingPage-loading">Loading...</div>
       </>
     );
   }
@@ -136,7 +138,7 @@ function BookingPage() {
     return (
       <>
         <Navbar />
-        <div className="loading">User not authenticated</div>
+        <div className="bookingPage-loading">User not authenticated</div>
       </>
     );
   }
@@ -145,7 +147,7 @@ function BookingPage() {
     return (
       <>
         <Navbar />
-        <div className="loading">Access denied. User not recognized as nurse or doctor.</div>
+        <div className="bookingPage-loading">Access denied. User not recognized as nurse or doctor.</div>
       </>
     );
   }
@@ -397,7 +399,8 @@ function BookingPage() {
 
           <MyBookings
             role={role}
-            doctor={inputValue}
+            doctorName={inputValue}
+            user={userData}
             bookings={myBookings}
             navatars={navatars}
             onSelectBookingForCancellation={handleSelectBookingForCancellation}

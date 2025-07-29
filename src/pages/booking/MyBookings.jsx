@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { Bot, MapPin } from 'lucide-react';
 
-function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancellation }) {
+function MyBookings({ role, doctorName, user, bookings, navatars, onSelectBookingForCancellation }) {
     const navigate = useNavigate();
     const [now, setNow] = useState(new Date());
 
@@ -13,7 +14,7 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
 
         return () => clearInterval(timer);
     }, []);
-    
+
     const [showReminder, setShowReminder] = useState(false);
     const [reminder, setReminder] = useState('');
     const [notifiedIntervals, setNotifiedIntervals] = useState({});
@@ -87,7 +88,7 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
     }, [bookings]);
 
 
-    if (role === 'nurse' && !doctor) {
+    if (role === 'nurse' && !doctorName) {
         return (
             <div className="my-bookings-list">
                 <h1>Select a Doctor</h1>
@@ -99,7 +100,7 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
     if (bookings.length === 0 || upcomingBookings.length === 0) {
         return (
             <div className="my-bookings-list">
-                <h1>{role === 'nurse' ? `${doctor}'s` : 'My'} Bookings</h1>
+                <h1>{role === 'nurse' ? `${doctorName}'s` : 'My'} Bookings</h1>
                 <p className="no-bookings">No upcoming bookings found.</p>
             </div>
         );
@@ -107,7 +108,7 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
 
     return (
         <div className="my-bookings-list">
-            <h1>{role === 'nurse' ? `${doctor}'s` : 'My'} Bookings</h1>
+            <h1>{role === 'nurse' ? `${doctorName}'s` : 'My'} Bookings</h1>
             {showReminder && (
                 <div className="popup reminder">
                     <span>{reminder}</span>
@@ -135,24 +136,30 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
                         >
                             <div className="booking-info">
                                 <div className='navatar-details'>
-                                    <div>Navatar: {navatar?.navatar_name || 'Unknown Navatar'}</div>
-                                    <div className="booking-location">Location: {navatar?.location || 'Location not set'}</div>
+                                    <div>
+                                        <Bot />
+                                        {navatar?.navatar_name || 'Unknown Navatar'}
+                                    </div>
+                                    <div className="booking-location">
+                                        <MapPin />
+                                        {navatar?.location || 'Location not set'}
+                                    </div>
                                 </div>
-                                <div className="time-detalis">
-                                    <span>{format(slot.date, 'MMMM d, yyyy')}</span>
-                                    <span>
+                                <div className="time-details">
+                                    <div>
+                                        {format(slot.date, 'MMMM d, yyyy')}
+                                    </div>
+                                    <div>
                                         {new Date(`1970-01-01T${slot.start_time}`).toLocaleTimeString([], {
                                             hour: '2-digit',
                                             minute: '2-digit',
                                         })}
-                                    </span>
-                                    -
-                                    <span>
+                                        -
                                         {new Date(`1970-01-01T${slot.end_time}`).toLocaleTimeString([], {
                                             hour: '2-digit',
                                             minute: '2-digit',
                                         })}
-                                    </span>
+                                    </div>
                                 </div>
                             </div>
                             <div className="booking-actions">
@@ -162,7 +169,15 @@ function MyBookings({ role, doctor, bookings, navatars, onSelectBookingForCancel
                                     ) : (
                                         <button
                                             className="btn btn-success"
-                                            onClick={() => navigate('/consultation')}
+                                            onClick={() => navigate('/consultation', {
+                                                state: {
+                                                    userData: {
+                                                        name: user.name,
+                                                        id: user.id
+                                                    },
+                                                    roomId: user.id
+                                                }
+                                            })}
                                         >
                                             Start
                                         </button>

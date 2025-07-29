@@ -197,14 +197,10 @@ function JoystickControl() {
 
   return (
     <div className="joystick-container">
-      <div className="connection-status">
+      <div className="bot-connection-status">
         <p>MQTT: <span className={mqttStatus.toLowerCase()}>{mqttStatus}</span></p>
         <p>Bot: <span className={botStatus === 'Ready' ? 'ready' : 'waiting'}>{botStatus}</span></p>
       </div>
-
-      {/* <div className="joystick-title">
-        <h3>Robot Controls</h3>
-      </div> */}
 
       <div className="joystick-stats">
         <div className="stat">
