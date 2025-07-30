@@ -24,7 +24,7 @@ class PeerManager {
 
     // Handle remote stream
     peerConnection.ontrack = (event) => {
-      console.log("Received remote track from:", peerId);
+      // console.log("Received remote track from:", peerId);
       if (this.onRemoteStream && event.streams[0]) {
         this.onRemoteStream(peerId, event.streams[0]);
       }
@@ -39,36 +39,36 @@ class PeerManager {
 
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-      console.log(
-        `Peer ${peerId} connection state:`,
-        peerConnection.connectionState
-      );
+      // console.log(
+      //   `Peer ${peerId} connection state:`,
+      //   peerConnection.connectionState
+      // );
 
       if (
         peerConnection.connectionState === "failed" ||
         peerConnection.connectionState === "disconnected"
       ) {
-        console.log(
-          `Peer ${peerId} connection failed, attempting to reconnect...`
-        );
+        // console.log(
+          // `Peer ${peerId} connection failed, attempting to reconnect...`
+        // );
         // Could implement reconnection logic here
       }
     };
 
     // Handle signaling state changes
     peerConnection.onsignalingstatechange = () => {
-      console.log(
-        `Peer ${peerId} signaling state:`,
-        peerConnection.signalingState
-      );
+      // console.log(
+      //   `Peer ${peerId} signaling state:`,
+      //   peerConnection.signalingState
+      // );
     };
 
     // Handle ICE connection state changes
     peerConnection.oniceconnectionstatechange = () => {
-      console.log(
-        `Peer ${peerId} ICE connection state:`,
-        peerConnection.iceConnectionState
-      );
+      // console.log(
+      //   `Peer ${peerId} ICE connection state:`,
+      //   peerConnection.iceConnectionState
+      // );
     };
 
     this.peerConnections.set(peerId, peerConnection);
@@ -77,11 +77,11 @@ class PeerManager {
     peerConnection.onnegotiationneeded = async () => {
       try {
         if (peerConnection.signalingState !== "stable") {
-          console.log("Signaling state not stable, skipping negotiation");
+          // console.log("Signaling state not stable, skipping negotiation");
           return;
         }
 
-        console.log("Negotiation needed for peer:", peerId);
+        // console.log("Negotiation needed for peer:", peerId);
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
@@ -124,7 +124,7 @@ class PeerManager {
     if (peerConnection) {
       peerConnection.close();
       this.peerConnections.delete(peerId);
-      console.log(`Removed peer connection for: ${peerId}`);
+      // console.log(`Removed peer connection for: ${peerId}`);
     }
   }
 
@@ -133,7 +133,7 @@ class PeerManager {
       peerConnection.close();
     }
     this.peerConnections.clear();
-    console.log("Closed all peer connections");
+    // console.log("Closed all peer connections");
   }
 }
 

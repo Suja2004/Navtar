@@ -130,7 +130,6 @@
   text-align: center;
   font-size: 0.875rem;
   color: var(--text-secondary);
-  /* flex-grow: 1; */
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -140,29 +139,42 @@
   margin-bottom: 0.5rem;
 }
 
-.bot-connection-status {
+.navatar-connection-status {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   margin-bottom: 1rem;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 500;
 }
 
-.bot-connection-status span.connected {
-  color: var(--success-green);
-}
-.bot-connection-status span.disconnected {
-  color: red;
-}
-.bot-connection-status span.waiting {
-  color: var(--warning-yellow);
-}
-.bot-connection-status span.ready {
-  color: var(--success-green);
+.status-connected {
+  background-color: #d4f7d4; 
+  color: #2ec72e;
+  border-color: #2ec72e;
 }
 
-@media (width <= 768px) {
+.status-connecting {
+  background-color: #fff6d1; 
+  color: #c9a703;
+  border-color: #c9a703;
+}
+
+.status-disconnected {
+  background-color: #f7d4d4;
+  color: #d12e2e; 
+  border-color: #d12e2e;
+}
+
+.obstacle-present {
+  color: #d12e2e;
+}
+
+.no-obstacle {
+  color: #2ec72e;
+}
+
+@media (width <= 900px) {
   .joystick-container {
     position: absolute;
     right: 0;
@@ -176,7 +188,7 @@
     border-radius: 50%;
   }
 
-  .bot-connection-status {
+  .navatar-connection-status {
     display: none;
   }
 

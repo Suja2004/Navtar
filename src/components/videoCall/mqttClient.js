@@ -13,7 +13,7 @@ const client = mqtt.connect('wss://a9088c6daa9e41e4b8f965ad7fd902a5.s1.eu.hivemq
 
 // Add detailed logging
 client.on('connect', () => {
-  console.log('✅ Web MQTT Client Connected');
+  // console.log('✅ Web MQTT Client Connected');
 });
 
 client.on('error', (error) => {
@@ -21,11 +21,11 @@ client.on('error', (error) => {
 });
 
 client.on('offline', () => {
-  console.log('📴 Web MQTT Client Offline');
+  // console.log('📴 Web MQTT Client Offline');
 });
 
 client.on('close', () => {
-  console.log('🔌 Web MQTT Connection Closed');
+  // console.log('🔌 Web MQTT Connection Closed');
 });
 
 export default client;

@@ -7,9 +7,12 @@ const NavatarList = ({ navatars, isNavatarSelectorOpen, selectedDate, onSelectNa
     useEffect(() => {
         const lower = search.toLowerCase();
         setFiltered(
-            navatars.filter((n) => n.location.toLowerCase().includes(lower))
+            navatars.filter((n) =>
+                n.location?.toLowerCase().includes(lower)
+            )
         );
     }, [search, navatars]);
+
 
     if (!isNavatarSelectorOpen || !selectedDate) return null;
 
@@ -29,25 +32,25 @@ const NavatarList = ({ navatars, isNavatarSelectorOpen, selectedDate, onSelectNa
                     onChange={(e) => setSearch(e.target.value)}
                     className="search-input"
                 />
-                <div className="card-grid">
-                    {filtered.length > 0 ? (
-                        filtered.map((navatar) => (
-                            <div
-                                key={navatar.navatar_id}
-                                className="card"
-                                onClick={() => onSelectNavatar(navatar)}
-                                style={{ cursor: "pointer" }}
-                            >
-                                <h3>{navatar.navatar_name}</h3>
-                                <p><strong>Location:</strong> {navatar.location}</p>
-                            </div>
-
-                        ))
-                    ) : (
-                        <p>No navatars found.</p>
-                    )}
+                <div className="card-container">
+                    <div className="card-grid">
+                        {filtered.length > 0 ? (
+                            filtered.map((navatar) => (
+                                <div
+                                    key={navatar.navatar_id}
+                                    className="card"
+                                    onClick={() => onSelectNavatar(navatar)}
+                                    style={{ cursor: "pointer" }}
+                                >
+                                    <h3>{navatar.navatar_name}</h3>
+                                    <p><strong>Location:</strong> {navatar.location}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <p>No navatars found.</p>
+                        )}
+                    </div>
                 </div>
-
             </div>
         </div >
     );

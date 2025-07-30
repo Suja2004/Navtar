@@ -3,7 +3,8 @@ import './JoystickControl.css';
 import mqttClient from './mqttClient';
 
 function JoystickControl() {
-  const [botStatus, setBotStatus] = useState('Waiting for Bot');
+  const [botStatus, setBotStatus] = useState('Waiting for Bot'); // Internal bot status
+  const [obstacleStatus, setObstacleStatus] = useState(null); // Obstacle info text or null
   const joystickRef = useRef(null);
   const handleRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -13,20 +14,19 @@ function JoystickControl() {
   const [robotStatus, setRobotStatus] = useState('Calibrating...');
   const [mqttStatus, setMqttStatus] = useState('Connecting...');
 
-  // Setup MQTT connection monitoring
+  // MQTT connection and message handlers
   useEffect(() => {
     let isSubscribed = false;
 
     const handleConnect = () => {
-      console.log('✅ MQTT connected');
+      // console.log('✅ MQTT connected');
       setMqttStatus('Connected');
 
-      // Add a small delay and check if client is still connected before subscribing
       setTimeout(() => {
         if (mqttClient.connected && !isSubscribed) {
           mqttClient.subscribe('bot/status', (err) => {
             if (!err) {
-              console.log('✅ Successfully subscribed to bot/status');
+              console.log('✅ Subscribed to bot/status');
               isSubscribed = true;
             } else {
               console.error('❌ Subscription error:', err);
@@ -37,9 +37,10 @@ function JoystickControl() {
     };
 
     const handleDisconnect = () => {
-      console.log('❌ MQTT disconnected');
+      // console.log('❌ MQTT disconnected');
       setMqttStatus('Disconnected');
       setBotStatus('Waiting for Bot');
+      setObstacleStatus(null);
       isSubscribed = false;
     };
 
@@ -49,56 +50,64 @@ function JoystickControl() {
     };
 
     const handleMessage = (topic, message) => {
-      console.log('📨 Received message:', topic, message.toString());
+      const msgStr = message.toString();
+      // console.log('📨 Received message:', topic, msgStr);
 
       if (topic === 'bot/status') {
-        const status = message.toString();
-        console.log('📡 Bot status:', status);
-        if (status === 'connected') {
-          setBotStatus('Ready');
-        } else if (status === 'moving') {
-          setBotStatus('Moving');
-        } else if (status === 'stopped') {
-          setBotStatus('Idle');
-        } else if (status === 'disconnected') {
-          setBotStatus('Disconnected');
+        if (msgStr.startsWith('Obstacle detected at:')) {
+          // Parse obstacle message
+          const parts = msgStr.replace('Obstacle detected at:', '').trim();
+          if (parts === '') {
+            setObstacleStatus(null); // No obstacles info
+          } else {
+            setObstacleStatus(parts); // e.g. "front left right"
+          }
+        } else {
+          // Normal bot status messages
+          if (msgStr === 'connected') {
+            setBotStatus('Ready');
+            setObstacleStatus(null);
+          } else if (msgStr === 'moving') {
+            setBotStatus('Moving');
+          } else if (msgStr === 'stopped') {
+            setBotStatus('Idle');
+          } else if (msgStr === 'disconnected') {
+            setBotStatus('Disconnected');
+            setObstacleStatus(null);
+          } else {
+            // Clear obstacle info on unknown messages to avoid stale display
+            setObstacleStatus(null);
+          }
         }
       }
     };
 
-    // Add event listeners
     mqttClient.on('connect', handleConnect);
     mqttClient.on('disconnect', handleDisconnect);
     mqttClient.on('error', handleError);
     mqttClient.on('message', handleMessage);
 
-    // If already connected, handle it
+    // If already connected when component mounts
     if (mqttClient.connected) {
-
       handleConnect();
     }
 
-    // Cleanup function
     return () => {
       mqttClient.off('connect', handleConnect);
       mqttClient.off('disconnect', handleDisconnect);
       mqttClient.off('error', handleError);
       mqttClient.off('message', handleMessage);
-
-      // Don't call mqttClient.end() here as it might be used by other components
     };
-  }, []); // Empty dependency array
+  }, []);
 
-  // Calculate speed and direction from position
+  // Calculate speed and direction based on joystick position
   useEffect(() => {
     const distance = Math.sqrt(position.x ** 2 + position.y ** 2);
     const maxDistance = 50;
     let normalizedSpeed = Math.min(Math.round((distance / maxDistance) * 100), 100);
 
-    // Apply a dead zone: treat anything below 15% as STOP
-    if (normalizedSpeed < 15) {
-      normalizedSpeed = 0;
-    }
+    // Dead zone < 15% means stop
+    if (normalizedSpeed < 15) normalizedSpeed = 0;
 
     setSpeed(normalizedSpeed);
 
@@ -118,15 +127,12 @@ function JoystickControl() {
     setDirection(newDirection);
     setRobotStatus(normalizedSpeed > 0 ? 'Moving' : 'Ready');
 
-    // Only publish if connected and not disconnecting
     if (mqttClient.connected) {
-      // Create and adjust the command
       const command = {
         direction: normalizedSpeed === 0 ? 'Stop' : newDirection,
-        speed: normalizedSpeed
+        speed: normalizedSpeed,
       };
 
-      // Only publish meaningful commands
       mqttClient.publish('robot/control', JSON.stringify(command), (err) => {
         if (!err) {
           console.log('📤 Published command:', command);
@@ -135,10 +141,9 @@ function JoystickControl() {
         }
       });
     }
-
   }, [position]);
 
-  // ... rest of your component code remains the same ...
+  // Joystick event handlers
   const handleStart = (x, y) => {
     if (!joystickRef.current) return;
     setIsDragging(true);
@@ -171,8 +176,17 @@ function JoystickControl() {
   const handleEnd = () => {
     setIsDragging(false);
     setPosition({ x: 0, y: 0 });
+
+    if (mqttClient.connected) {
+      const stopCmd = { direction: 'Stop', speed: 0 };
+      mqttClient.publish('robot/control', JSON.stringify(stopCmd));
+      setTimeout(() => {
+        mqttClient.publish('robot/control', JSON.stringify(stopCmd));
+      }, 150);
+    }
   };
 
+  // Mouse and touch event wrappers
   const onMouseDown = e => handleStart(e.clientX, e.clientY);
   const onMouseMove = e => handleMove(e.clientX, e.clientY);
   const onMouseUp = () => handleEnd();
@@ -180,6 +194,7 @@ function JoystickControl() {
   const onTouchMove = e => e.touches[0] && handleMove(e.touches[0].clientX, e.touches[0].clientY);
   const onTouchEnd = () => handleEnd();
 
+  // Attach/detach listeners based on dragging state
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', onMouseMove);
@@ -195,11 +210,38 @@ function JoystickControl() {
     };
   }, [isDragging]);
 
+  // Combined connection status display logic
+  let connectionClass = '';
+  let connectionText = '';
+
+  if (mqttStatus === 'Connected' && botStatus === 'Ready') {
+    connectionClass = 'status-connected';
+    connectionText = 'Navtar is Ready';
+  } else if (mqttStatus === 'Connected' && botStatus !== 'Ready') {
+    connectionClass = 'status-connecting';
+    connectionText = 'Navtar is Connecting...';
+  } else if (mqttStatus === 'Connecting' || mqttStatus === 'Error') {
+    connectionClass = 'status-connecting';
+    connectionText = 'Navtar is Connecting...';
+  } else {
+    connectionClass = 'status-disconnected';
+    connectionText = 'Navtar Disconnected';
+  }
+
   return (
     <div className="joystick-container">
-      <div className="bot-connection-status">
-        <p>MQTT: <span className={mqttStatus.toLowerCase()}>{mqttStatus}</span></p>
-        <p>Bot: <span className={botStatus === 'Ready' ? 'ready' : 'waiting'}>{botStatus}</span></p>
+      <div className={`navatar-connection-status ${connectionClass}`}>
+        {connectionText}
+
+        <div className={`obstacle-status-box ${obstacleStatus ? 'obstacle-present' : 'no-obstacle'}`}>
+          {obstacleStatus ? (
+            <>
+              <strong>Obstacle detected at:</strong> {obstacleStatus}
+            </>
+          ) : (
+            'No obstacles detected'
+          )}
+        </div>
       </div>
 
       <div className="joystick-stats">
@@ -228,7 +270,7 @@ function JoystickControl() {
       </div>
 
       <div className="control-instructions">
-        <p>Click and drag joystick to navigate robot</p>
+        <p>Click and drag joystick to navigate Navtar</p>
         <p>Release to stop movement</p>
       </div>
     </div>

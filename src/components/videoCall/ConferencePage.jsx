@@ -6,7 +6,7 @@ import ChatPanel from "./ChatPanel";
 import PeerManager from "../../services/PeerManager";
 import './VideoConsultation.css'
 
-const ConferencePage = ({ user, room, onLeave }) => {
+const ConferencePage = ({ user, room, onLeave, fullScreen, toggleFullScreen }) => {
   const socket = useSocket();
   const [participants, setParticipants] = useState(new Map());
   const [myStream, setMyStream] = useState(null);
@@ -16,10 +16,8 @@ const ConferencePage = ({ user, room, onLeave }) => {
   const [messages, setMessages] = useState([]);
 
   const peerManager = useRef(new PeerManager()).current;
+  const containerRef = useRef(null);
 
-  console.log(room);
-
-  
   // Initialize media stream
   useEffect(() => {
     const initializeStream = async () => {
@@ -73,7 +71,7 @@ const ConferencePage = ({ user, room, onLeave }) => {
   // Socket event handlers
   const handleUserJoined = useCallback(
     async ({ email, name, id }) => {
-      console.log(`${name} joined the room`);
+      // console.log(`${name} joined the room`);
 
       // Add participant to list first
       setParticipants(
@@ -114,7 +112,7 @@ const ConferencePage = ({ user, room, onLeave }) => {
 
   const handleWebRTCOffer = useCallback(
     async ({ from, offer, name }) => {
-      console.log("Received offer from:", name);
+      // console.log("Received offer from:", name);
 
       try {
         const peerConnection = await peerManager.createPeerConnection(
@@ -158,7 +156,7 @@ const ConferencePage = ({ user, room, onLeave }) => {
 
   const handleWebRTCAnswer = useCallback(
     async ({ from, answer }) => {
-      console.log("Received answer from:", from);
+      // console.log("Received answer from:", from);
 
       try {
         const peerConnection = peerManager.getPeerConnection(from);
@@ -199,9 +197,8 @@ const ConferencePage = ({ user, room, onLeave }) => {
     });
   }, []);
 
-  // Handle existing participants (when joining a room with people already in it)
   const handleExistingParticipants = useCallback((existingParticipants) => {
-    console.log("Existing participants:", existingParticipants);
+    // console.log("Existing participants:", existingParticipants);
 
     // Add existing participants to the list
     existingParticipants.forEach(({ id, name, email }) => {
@@ -224,7 +221,7 @@ const ConferencePage = ({ user, room, onLeave }) => {
 
   const handleUserLeft = useCallback(
     ({ id, name }) => {
-      console.log(`${name} left the room`);
+      // console.log(`${name} left the room`);
       peerManager.removePeerConnection(id);
       setParticipants((prev) => {
         const updated = new Map(prev);
@@ -424,6 +421,8 @@ const ConferencePage = ({ user, room, onLeave }) => {
     window.location.reload();
   }, [myStream, peerManager, socket, room, onLeave]);
 
+
+
   return (
     <div className="conference-container">
       <div className="conference-header">
@@ -453,6 +452,8 @@ const ConferencePage = ({ user, room, onLeave }) => {
         onToggleChat={() => setShowChat(!showChat)}
         onLeave={leaveConference}
         participantCount={participants.size}
+        fullScreen={fullScreen}
+        onToggleFullScreen={toggleFullScreen}
       />
     </div>
   );

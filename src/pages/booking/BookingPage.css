@@ -293,14 +293,21 @@ li.no-bookings {
   width: 500px;
   max-width: 800px;
   padding: 20px;
-  max-width: 800px;
   margin: auto;
-  overflow-x: auto;
+  overflow: hidden;
   z-index: -1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-container {
+  height: 300px;
+  overflow: auto;
+  padding: 8px;
 }
 
 .navatar-container .search-input {
-  padding: 10px;
+  padding: 1rem;
   width: 300px;
   margin-bottom: 20px;
   font-size: 1rem;
@@ -310,7 +317,7 @@ li.no-bookings {
 
 .navatar-container .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(1, minmax(220px, 1fr));
   gap: 20px;
 }
 
@@ -331,7 +338,7 @@ li.no-bookings {
   margin-top: 0;
 }
 
-@media (width <= 768px) {
+@media (width <= 900px) {
   .booking-page {
     padding: 1rem;
     display: flex;
@@ -408,6 +415,10 @@ li.no-bookings {
   .booking-actions {
     display: flex;
     flex-direction: row;
+  }
+
+  .navatar-container {
+    width: 80%;
   }
 }
 

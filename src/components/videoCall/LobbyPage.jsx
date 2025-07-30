@@ -13,10 +13,12 @@ const LobbyPage = ({ initialUser, initialRoomId }) => {
   const [isAudioOn, setIsAudioOn] = useState(true);
   const [previewStream, setPreviewStream] = useState(null);
   const [hasJoined, setHasJoined] = useState(false);
+  const [fullScreen, setFullScreen] = useState(false);
 
   const videoRef = useRef(null);
   const socket = useSocket();
   const navigate = useNavigate();
+  const containerRef = useRef(null);
 
   useEffect(() => {
     navigator.mediaDevices
@@ -98,13 +100,31 @@ const LobbyPage = ({ initialUser, initialRoomId }) => {
     setIsAudioOn((prev) => !prev);
   };
 
+  const toggleFullScreen = () => {
+    const el = containerRef.current;
+
+    if (!document.fullscreenElement) {
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+      setFullScreen(true);
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.msExitFullscreen) document.msExitFullscreen();
+      setFullScreen(false);
+    }
+  };
+
   if (hasJoined && user) {
     return (
-      <div className="conference-page">
+      <div ref={containerRef} className="conference-page">
         <ConferencePage
           user={user}
           room={roomId}
           onLeave={handleLeave}
+          fullScreen={fullScreen}
+          toggleFullScreen={toggleFullScreen}
         />
         <JoystickControl />
       </div>
