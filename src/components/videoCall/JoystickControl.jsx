@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import './JoystickControl.css';
-import mqttClient from './mqttClient';
+// import mqttClient from './mqttClient';
+import mqtt from 'mqtt';
 
-function JoystickControl() {
+function JoystickControl({ mqttUrl, mqttOptions }) {
   const [botStatus, setBotStatus] = useState('Waiting for Bot'); // Internal bot status
   const [obstacleStatus, setObstacleStatus] = useState(null); // Obstacle info text or null
   const joystickRef = useRef(null);
@@ -14,8 +15,12 @@ function JoystickControl() {
   const [robotStatus, setRobotStatus] = useState('Calibrating...');
   const [mqttStatus, setMqttStatus] = useState('Connecting...');
 
+  const mqttClientRef = useRef(null);
+
   // MQTT connection and message handlers
   useEffect(() => {
+    const client = mqtt.connect(mqttUrl, mqttOptions);
+    mqttClientRef.current = client;
     let isSubscribed = false;
 
     const handleConnect = () => {
@@ -23,8 +28,8 @@ function JoystickControl() {
       setMqttStatus('Connected');
 
       setTimeout(() => {
-        if (mqttClient.connected && !isSubscribed) {
-          mqttClient.subscribe('bot/status', (err) => {
+        if (mqttClientRef.current?.connected && !isSubscribed) {
+          mqttClientRef.current?.subscribe('bot/status', (err) => {
             if (!err) {
               console.log('✅ Subscribed to bot/status');
               isSubscribed = true;
@@ -82,21 +87,21 @@ function JoystickControl() {
       }
     };
 
-    mqttClient.on('connect', handleConnect);
-    mqttClient.on('disconnect', handleDisconnect);
-    mqttClient.on('error', handleError);
-    mqttClient.on('message', handleMessage);
+    mqttClientRef.current?.on('connect', handleConnect);
+    mqttClientRef.current?.on('disconnect', handleDisconnect);
+    mqttClientRef.current?.on('error', handleError);
+    mqttClientRef.current?.on('message', handleMessage);
 
     // If already connected when component mounts
-    if (mqttClient.connected) {
+    if (mqttClientRef.current?.connected) {
       handleConnect();
     }
 
     return () => {
-      mqttClient.off('connect', handleConnect);
-      mqttClient.off('disconnect', handleDisconnect);
-      mqttClient.off('error', handleError);
-      mqttClient.off('message', handleMessage);
+      mqttClientRef.current?.off('connect', handleConnect);
+      mqttClientRef.current?.off('disconnect', handleDisconnect);
+      mqttClientRef.current?.off('error', handleError);
+      mqttClientRef.current?.off('message', handleMessage);
     };
   }, []);
 
@@ -127,15 +132,15 @@ function JoystickControl() {
     setDirection(newDirection);
     setRobotStatus(normalizedSpeed > 0 ? 'Moving' : 'Ready');
 
-    if (mqttClient.connected) {
+    if (mqttClientRef.current.connected) {
       const command = {
         direction: normalizedSpeed === 0 ? 'Stop' : newDirection,
         speed: normalizedSpeed,
       };
 
-      mqttClient.publish('robot/control', JSON.stringify(command), (err) => {
+      mqttClientRef.current.publish('robot/control', JSON.stringify(command), (err) => {
         if (!err) {
-          console.log('📤 Published command:', command);
+          // console.log('📤 Published command:', command);
         } else {
           console.error('❌ Publish error:', err);
         }
@@ -177,11 +182,11 @@ function JoystickControl() {
     setIsDragging(false);
     setPosition({ x: 0, y: 0 });
 
-    if (mqttClient.connected) {
+    if (mqttClientRef.current.connected) {
       const stopCmd = { direction: 'Stop', speed: 0 };
-      mqttClient.publish('robot/control', JSON.stringify(stopCmd));
+      mqttClientRef.current.publish('robot/control', JSON.stringify(stopCmd));
       setTimeout(() => {
-        mqttClient.publish('robot/control', JSON.stringify(stopCmd));
+        mqttClientRef.current.publish('robot/control', JSON.stringify(stopCmd));
       }, 150);
     }
   };
@@ -265,7 +270,7 @@ function JoystickControl() {
         <div
           ref={handleRef}
           style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
-          className={` joystick-handle ${botStatus} === 'Ready' ? ready : waiting`}
+          className={`joystick-handle ${botStatus === 'Ready' ? 'ready' : 'waiting'}`} 
         ></div>
       </div>
 

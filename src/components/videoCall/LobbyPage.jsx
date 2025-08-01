@@ -5,6 +5,16 @@ import ConferencePage from "./ConferencePage";
 import { useNavigate } from "react-router-dom";
 import JoystickControl from "./JoystickControl";
 
+const mqttUrl = 'wss://a9088c6daa9e41e4b8f965ad7fd902a5.s1.eu.hivemq.cloud:8884/mqtt';
+const mqttOptions = {
+  username: 'yogin',
+  password: 'Yogin@2004',
+  clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
+  clean: true,
+  reconnectPeriod: 1000,
+  connectTimeout: 30000
+};
+
 const LobbyPage = ({ initialUser, initialRoomId }) => {
   const [name, setName] = useState(initialUser?.name || "");
   const [roomId, setRoomId] = useState(initialRoomId || "");
@@ -126,7 +136,7 @@ const LobbyPage = ({ initialUser, initialRoomId }) => {
           fullScreen={fullScreen}
           toggleFullScreen={toggleFullScreen}
         />
-        <JoystickControl />
+        <JoystickControl mqttUrl={mqttUrl} mqttOptions={mqttOptions} />;
       </div>
     );
   }
