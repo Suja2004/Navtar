@@ -126,7 +126,14 @@ const LobbyPage = ({ initialUser, initialRoomId }) => {
           fullScreen={fullScreen}
           toggleFullScreen={toggleFullScreen}
         />
-        <JoystickControl />
+        <JoystickControl
+          mqttConfig={{
+            host: 'wss://a9088c6daa9e41e4b8f965ad7fd902a5.s1.eu.hivemq.cloud:8884/mqtt',
+            username: 'yogin',
+            password: 'Yogin@2004',
+            clientId: 'web_client_' + Math.random().toString(16).substr(2, 8),
+          }}
+        />
       </div>
     );
   }
